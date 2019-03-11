@@ -1,0 +1,29 @@
+{
+    "name": "speech-recognizer-project",
+    "version": "1.0.0",
+    "description": "speech recognizer",
+    "main": "index.js",
+    "scripts": {
+        "build": "webpack",
+        "production-build": "webpack --mode production",
+        "watch": "webpack --watch",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Hiroshi Manabe",
+    "license": "MIT",
+    "devDependencies": {
+        "@types/es6-promise": "^3.3.0",
+        "awesome-typescript-loader": "^5.2.1",
+        "source-map-loader": "^0.2.4",
+        "typescript": "^3.3.3333",
+        "webpack": "^4.29.6",
+        "webpack-cli": "^3.2.3"
+    },
+    "dependencies": {
+        "@types/react": "^16.8.6",
+        "@types/react-dom": "^16.8.2",
+        "react": "^16.8.3",
+        "react-dom": "^16.8.3"
+    },
+    "private": true
+}
