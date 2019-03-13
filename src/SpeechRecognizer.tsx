@@ -40,6 +40,50 @@ export function SpeechRecognizer(props: Props) {
     SpeechRecogintionResult[]
   >([]);
 
+  const zeroPaddingMax3 = (
+    num: number,
+    length: number) => {
+    return `00${num}`.slice(-length)
+  };
+
+  const formatTime = (t: number) => {
+    return zeroPaddingMax3(Math.floor(t/3600000),2) +
+           ":" +
+           zeroPaddingMax3((Math.floor(t/60000)) % 60, 2) +
+           ":" +
+           zeroPaddingMax3((Math.floor(t/1000)) % 60, 2) +
+           "," +
+           zeroPaddingMax3(t % 1000, 3);
+  };
+
+  const recordToTranscript = (r: SpeechRecord) => {
+    return r.results.map(i => i.transcript).join(". ");
+  };
+
+  const recordsToString = (
+    records: SpeechRecord[],
+    startAt: number,
+    format: Format
+  ) => {
+    let result = "";
+    let count = 1;
+    for (let r of records) {
+      if (format == Format.PLAIN) {
+         result += recordToTranscript(r) + "\n";
+      }
+      else if (format == Format.TIMESTAMP) {
+         result += `${Math.floor((r.start - startAt) / 1000)}s: ` + recordToTranscript(r) + "\n";
+      }
+      else if (format == Format.SRT) {
+        result += `${count}\n`;
+        result += formatTime(r.start - startAt) + " --> " + formatTime(r.end - startAt) + "\n";
+        result += recordToTranscript(r) + "\n\n";
+      }
+      count++;
+    }
+    return result;
+  }
+
   const onRecordStart = async () => {
     const mediaRecorder = await createMediaRecorder({
       onData(chunks) {
@@ -147,6 +191,13 @@ export function SpeechRecognizer(props: Props) {
     { value: "hi-IN", label: "हिन्दी" },
     { value: "th-TH", label: "ภาษาไทย" }
   ];
+
+  useEffect(
+    () => {
+      setLang(langs[0].value);
+    },
+    []
+  );
   const formats = [ Format.PLAIN, Format.TIMESTAMP, Format.SRT ];
 
   const onLangChange = (event: React.FormEvent<HTMLSelectElement>) => {
@@ -193,48 +244,4 @@ export function SpeechRecognizer(props: Props) {
       </div>
     </>
   );
-}
-
-function zeroPaddingMax3(
-  num: number,
-  length: number) {
-  return `00${num}`.slice(-length)
-}
-
-function formatTime(t: number) {
-  return zeroPaddingMax3(Math.floor(t/3600000),2) +
-         ":" +
-         zeroPaddingMax3((Math.floor(t/60000)) % 60, 2) +
-         ":" +
-         zeroPaddingMax3((Math.floor(t/1000)) % 60, 2) +
-         "," +
-         zeroPaddingMax3(t % 1000, 3);
-}
-
-function recordToTranscript(r: SpeechRecord) {
-  return r.results.map(i => i.transcript).join(". ");
-}
-
-function recordsToString(
-  records: SpeechRecord[],
-  startAt: number,
-  format: Format
-) {
-  var result = "";
-  var count = 1;
-  for (let r of records) {
-    if (format == Format.PLAIN) {
-       result += recordToTranscript(r) + "\n";
-    }
-    else if (format == Format.TIMESTAMP) {
-       result += `${Math.floor((r.start - startAt) / 1000)}s: ` + recordToTranscript(r) + "\n";
-    }
-    else if (format == Format.SRT) {
-       result += `${count}\n`;
-       result += formatTime(r.start - startAt) + " --> " + formatTime(r.end - startAt) + "\n";
-       result += recordToTranscript(r) + "\n\n";
-    }
-    count++;
-  }
-  return result;
 }
