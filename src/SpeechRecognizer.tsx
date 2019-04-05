@@ -29,11 +29,12 @@ let formatStrings = [
 
 export function SpeechRecognizer(props: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [isRecoding, setRecording] = useState(false);
+  const [isRecording, setRecording] = useState(false);
   const [step, setStep] = useState(0);
   const [startAt, setStartAt] = useState(0);
   const [format, setFormat] = useState(Format.PLAIN);
   const [lang, setLang] = useState("");
+  const [offset, setOffset] = useState(0);
 
   // const [records, setRecords] = useState<SpeechRecord[]>([]);
   const [currentResults, setCurrentResults] = useState<
@@ -47,13 +48,14 @@ export function SpeechRecognizer(props: Props) {
   };
 
   const formatTime = (t: number) => {
-    return zeroPaddingMax3(Math.floor(t/3600000),2) +
+    const t2 = t < 0 ? 0 : t;
+    return zeroPaddingMax3(Math.floor(t2/3600000),2) +
            ":" +
-           zeroPaddingMax3((Math.floor(t/60000)) % 60, 2) +
+           zeroPaddingMax3((Math.floor(t2/60000)) % 60, 2) +
            ":" +
-           zeroPaddingMax3((Math.floor(t/1000)) % 60, 2) +
+           zeroPaddingMax3((Math.floor(t2/1000)) % 60, 2) +
            "," +
-           zeroPaddingMax3(t % 1000, 3);
+           zeroPaddingMax3(t2 % 1000, 3);
   };
 
   const recordToTranscript = (r: SpeechRecord) => {
@@ -68,15 +70,15 @@ export function SpeechRecognizer(props: Props) {
     let result = "";
     let count = 1;
     for (let r of records) {
-      if (format == Format.PLAIN) {
+      if (format === Format.PLAIN) {
          result += recordToTranscript(r) + "\n";
       }
-      else if (format == Format.TIMESTAMP) {
-         result += `${Math.floor((r.start - startAt) / 1000)}s: ` + recordToTranscript(r) + "\n";
+      else if (format === Format.TIMESTAMP) {
+         result += `${Math.floor((r.start - startAt + offset) / 1000)}s: ` + recordToTranscript(r) + "\n";
       }
-      else if (format == Format.SRT) {
+      else if (format === Format.SRT) {
         result += `${count}\n`;
-        result += formatTime(r.start - startAt) + " --> " + formatTime(r.end - startAt) + "\n";
+        result += formatTime(r.start - startAt + offset) + " --> " + formatTime(r.end - startAt + offset) + "\n";
         result += recordToTranscript(r) + "\n\n";
       }
       count++;
@@ -114,7 +116,7 @@ export function SpeechRecognizer(props: Props) {
 
   useEffect(
     () => {
-      if (!isRecoding) {
+      if (!isRecording) {
         return;
       }
       let recognition = createSpeechRecognition({
@@ -150,7 +152,7 @@ export function SpeechRecognizer(props: Props) {
         recognition = null;
       };
     },
-    [isRecoding, step]
+    [isRecording, step]
   );
 
   const speechText = recordsToString(records, 0, format);
@@ -192,26 +194,63 @@ export function SpeechRecognizer(props: Props) {
     { value: "th-TH", label: "ภาษาไทย" }
   ];
 
+  const getMatchLang = (browserLang: string, recognitionLangs: string[]) => {
+    let t = browserLang.split("-");
+    let rls = recognitionLangs.map(rl => {
+      let x = rl.toLowerCase();
+      let t2 = x.split("-");
+      if (t2[0] === "cmn" || t2[0] === "yue") {
+        return "zh-" + t2[t2.length - 1];
+      }
+      return x;
+    });
+    let toOrigMap: { [key:string]: string; } = {};
+    for (let i = 0; i < rls.length; ++i) {
+      toOrigMap[rls[i]] = recognitionLangs[i];
+    }
+    let filtered_2 = rls.filter(rl => rl === browserLang);
+    if (filtered_2.length == 1) {
+      return toOrigMap[filtered_2[0]];
+    }
+    let filtered_1 = rls.filter(rl => (rl.split("-"))[0] === t[0]);
+    let t2 = filtered_1.length > 1 ? (filtered_1.filter(rl => rl === "en-us" || rl === "es-es" || rl === "pt-pt" || rl === "zh-ch"))[0] : filtered_1.length == 1 ? filtered_1[0] : "en-us";
+    return toOrigMap[t2];
+  };
+
+  let browserLang = (window.navigator.languages && window.navigator.languages[0]) ||
+                    window.navigator.language;
+  const storedLang = localStorage.getItem("lang");           let defaultLang = (storedLang === null || storedLang == "") ? getMatchLang(browserLang, langs.map(x => x.value)) : storedLang;
+  const formats = [ Format.PLAIN, Format.TIMESTAMP, Format.SRT ];
+  const storedFormatStr = localStorage.getItem("format");
+  const defaultFormat = storedFormatStr === null ? Format.PLAIN : Number(storedFormatStr);
   useEffect(
     () => {
-      setLang(langs[0].value);
+      setLang(defaultLang);
+      setFormat(defaultFormat);
     },
     []
   );
-  const formats = [ Format.PLAIN, Format.TIMESTAMP, Format.SRT ];
 
   const onLangChange = (event: React.FormEvent<HTMLSelectElement>) => {
     setLang(event.currentTarget.value);
+    localStorage.setItem("lang", event.currentTarget.value);
   };
   const onFormatChange = (event: React.FormEvent<HTMLSelectElement>) => {
     setFormat(Number(event.currentTarget.value));
+    localStorage.setItem("format", event.currentTarget.value);
+  };
+  const onOffsetChange = (event: React.FormEvent<HTMLInputElement>) => {
+    setOffset(Number(event.currentTarget.value));
   };
   return (
     <>
-      <select onChange={onLangChange}>
+      <select onChange={onLangChange} value={lang}>
         { langs.map((x) => <option key={x.label} value={x.value}>{x.label}</option>) }
       </select>
-      {isRecoding ? (
+      &nbsp;Offset (milliseconds):
+      <input type="number" value={offset} min="-1000000" max="1000000" step="50" onChange={onOffsetChange} />
+      &nbsp;
+      {isRecording ? (
         <>
           <button onClick={onRecordEnd}>recording end</button>
           &nbsp; Recording...
@@ -232,13 +271,13 @@ export function SpeechRecognizer(props: Props) {
       <textarea
         ref={textareaRef}
         placeholder="Press start to record..."
-        readOnly={isRecoding}
+        readOnly={isRecording}
         style={{ width: "95vw", height: "60vh" }}
         value={speechText}
         onChange={() => {}}
       />
       <div>
-      <select onChange={onFormatChange}>
+      <select onChange={onFormatChange} value={format}>
         { formats.map((x) => <option key={x} value={x}>{formatStrings[x]}</option>) }
       </select>
       </div>
