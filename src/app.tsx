@@ -4,21 +4,32 @@ import {SpeechRecord} from "./utils";
 
 export const App = () => {
   const media = useRef<HTMLAudioElement>(null);
-  const [blobURL, setBlobURL] = useState<string>("");
-  const [records, setRecords] = useState<SpeechRecord[]>();
-  const blobUpdated = useCallback(function(blob: Blob, records: SpeechRecord[]) {
+  const [soundBlobURL, setSoundBlobURL] = useState<string>("");
+  const [textBlobURL, setTextBlobURL] = useState<string>("");
+  const [filename, setFilename] = useState<string>();
+  const soundBlobUpdated = useCallback(function(soundBlob: Blob) {
     if (media.current) {
-      var url = URL.createObjectURL(blob);
-      setBlobURL(url);
-      media.current.src = url;
+      let soundURL = URL.createObjectURL(soundBlob);
+      setSoundBlobURL(soundURL);
+      media.current.src = soundURL;
     }
-    setRecords(records);
-  }, [blobURL]);
+  }, [soundBlobURL]);
+  const textUpdated = useCallback(function(text: string, fname: string) {
+    if (text !== "") {
+      let textBlob = new Blob([text], { "type": "text/plain" });
+      let textURL = URL.createObjectURL(textBlob);
+      setTextBlobURL(textURL);
+      setFilename(fname);
+    }
+  }, [textBlobURL, filename]);
   return (
     <>
-      <SpeechRecognizer onBlobUpdated={blobUpdated} />
-      <div style={ blobURL == "" ? { display: "none"} : { display: "block"} }>
-      <audio ref={media} controls={!0} />
+      <SpeechRecognizer onSoundBlobUpdated={soundBlobUpdated} onTextUpdated={textUpdated} />
+      <div style={ textBlobURL === "" ? { display: "none"} : { display: "block"} }>
+        <a href={ textBlobURL } download={filename}>Download</a>
+      </div>
+      <div style={ soundBlobURL === "" ? { display: "none"} : { display: "block"} }>
+        <audio ref={media} controls={!0} />
       </div>
     </>
   );

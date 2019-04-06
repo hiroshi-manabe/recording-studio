@@ -11,7 +11,8 @@ let currentSpeechRecognition: any | null = null;
 let currentMediaRecorder: any | null = null;
 
 type Props = {
-  onBlobUpdated: (blob: Blob, records: SpeechRecord[]) => void;
+  onSoundBlobUpdated: (soundBlob: Blob) => void;
+  onTextUpdated: (text: string, filename: string) => void;
 };
 
 let records: SpeechRecord[] = [];
@@ -31,10 +32,11 @@ export function SpeechRecognizer(props: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isRecording, setRecording] = useState(false);
   const [step, setStep] = useState(0);
-  const [startAt, setStartAt] = useState(0);
   const [format, setFormat] = useState(Format.PLAIN);
   const [lang, setLang] = useState("");
+  const [startAt, setStartAt] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [filename, setFilename] = useState("");
 
   // const [records, setRecords] = useState<SpeechRecord[]>([]);
   const [currentResults, setCurrentResults] = useState<
@@ -58,6 +60,10 @@ export function SpeechRecognizer(props: Props) {
            zeroPaddingMax3(t2 % 1000, 3);
   };
 
+  const formatDate = (d: Date) => {
+    return d.getFullYear() + zeroPaddingMax3(d.getMonth() + 1, 2) + zeroPaddingMax3(d.getDate(), 2) + "-" + zeroPaddingMax3(d.getHours(), 2) + zeroPaddingMax3(d.getMinutes(), 2) + zeroPaddingMax3(d.getSeconds(), 2);
+  }
+
   const recordToTranscript = (r: SpeechRecord) => {
     return r.results.map(i => i.transcript).join(". ");
   };
@@ -74,11 +80,11 @@ export function SpeechRecognizer(props: Props) {
          result += recordToTranscript(r) + "\n";
       }
       else if (format === Format.TIMESTAMP) {
-         result += `${Math.floor((r.start - startAt + offset) / 1000)}s: ` + recordToTranscript(r) + "\n";
+         result += `${Math.floor((r.start - startAt) / 1000)}s: ` + recordToTranscript(r) + "\n";
       }
       else if (format === Format.SRT) {
         result += `${count}\n`;
-        result += formatTime(r.start - startAt + offset) + " --> " + formatTime(r.end - startAt + offset) + "\n";
+        result += formatTime(r.start - startAt) + " --> " + formatTime(r.end - startAt) + "\n";
         result += recordToTranscript(r) + "\n\n";
       }
       count++;
@@ -93,7 +99,10 @@ export function SpeechRecognizer(props: Props) {
         console.log(`size: ${Math.floor(size / 1000)}kb`);
       },
       onRecordEnd(blob) {
-        props.onBlobUpdated(blob, records);
+        let fname = formatDate(new Date());
+        setFilename(fname);
+        props.onSoundBlobUpdated(blob);
+        props.onTextUpdated(recordsToString(records, -offset, format), fname + (format === Format.SRT ? ".srt" : ".txt"));
       }
     });
     currentMediaRecorder = mediaRecorder;
@@ -155,7 +164,7 @@ export function SpeechRecognizer(props: Props) {
     [isRecording, step]
   );
 
-  const speechText = recordsToString(records, 0, format);
+  const speechText = recordsToString(records, -offset, format);
 
   // scroll to bottom
   useEffect(
@@ -209,17 +218,17 @@ export function SpeechRecognizer(props: Props) {
       toOrigMap[rls[i]] = recognitionLangs[i];
     }
     let filtered_2 = rls.filter(rl => rl === browserLang);
-    if (filtered_2.length == 1) {
+    if (filtered_2.length === 1) {
       return toOrigMap[filtered_2[0]];
     }
     let filtered_1 = rls.filter(rl => (rl.split("-"))[0] === t[0]);
-    let t2 = filtered_1.length > 1 ? (filtered_1.filter(rl => rl === "en-us" || rl === "es-es" || rl === "pt-pt" || rl === "zh-ch"))[0] : filtered_1.length == 1 ? filtered_1[0] : "en-us";
+    let t2 = filtered_1.length > 1 ? (filtered_1.filter(rl => rl === "en-us" || rl === "es-es" || rl === "pt-pt" || rl === "zh-ch"))[0] : filtered_1.length === 1 ? filtered_1[0] : "en-us";
     return toOrigMap[t2];
   };
 
   let browserLang = (window.navigator.languages && window.navigator.languages[0]) ||
                     window.navigator.language;
-  const storedLang = localStorage.getItem("lang");           let defaultLang = (storedLang === null || storedLang == "") ? getMatchLang(browserLang, langs.map(x => x.value)) : storedLang;
+  const storedLang = localStorage.getItem("lang");           let defaultLang = (storedLang === null || storedLang === "") ? getMatchLang(browserLang, langs.map(x => x.value)) : storedLang;
   const formats = [ Format.PLAIN, Format.TIMESTAMP, Format.SRT ];
   const storedFormatStr = localStorage.getItem("format");
   const defaultFormat = storedFormatStr === null ? Format.PLAIN : Number(storedFormatStr);
@@ -236,10 +245,14 @@ export function SpeechRecognizer(props: Props) {
     localStorage.setItem("lang", event.currentTarget.value);
   };
   const onFormatChange = (event: React.FormEvent<HTMLSelectElement>) => {
-    setFormat(Number(event.currentTarget.value));
+    let f = Number(event.currentTarget.value);
+    setFormat(f);
+    props.onTextUpdated(recordsToString(records, -offset, f), filename + (f === Format.SRT ? ".srt" : ".txt"));
     localStorage.setItem("format", event.currentTarget.value);
   };
   const onOffsetChange = (event: React.FormEvent<HTMLInputElement>) => {
+    let o = Number(event.currentTarget.value);
+    props.onTextUpdated(recordsToString(records, -o, format), filename + (format === Format.SRT ? ".srt" : ".txt"));
     setOffset(Number(event.currentTarget.value));
   };
   return (
