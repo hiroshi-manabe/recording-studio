@@ -243,6 +243,10 @@ export function SpeechRecognizer(props: Props) {
   const onLangChange = (event: React.FormEvent<HTMLSelectElement>) => {
     setLang(event.currentTarget.value);
     localStorage.setItem("lang", event.currentTarget.value);
+    if (currentSpeechRecognition) {
+      currentSpeechRecognition.stop();
+      currentSpeechRecognition.lang = event.currentTarget.value;
+    }
   };
   const onFormatChange = (event: React.FormEvent<HTMLSelectElement>) => {
     let f = Number(event.currentTarget.value);
